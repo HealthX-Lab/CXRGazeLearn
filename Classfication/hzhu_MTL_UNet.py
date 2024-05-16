@@ -13,6 +13,7 @@ from classy_vision.generic.distributed_util import (
 )
 from loss import *
 from models.DenseEDModel import DenseEDNet
+import timm
 
 class SEBlock(nn.Module):
     def __init__(self, channel, reduction=16):
@@ -46,13 +47,9 @@ def conv_block(in_ch, out_ch, dropout_rate=0.25):
     conv = nn.Sequential(
         ResidualBlock(in_ch, out_ch),
         SEBlock(out_ch),
+        # ResidualBlock(out_ch, out_ch),
+        # SEBlock(out_ch),
     )
-    # conv = nn.Sequential(
-    #     nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=True),
-    #     nn.ReLU(inplace=True),
-    #     nn.Conv2d(out_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=True),
-    #     nn.ReLU(inplace=True),
-    # )
         
     return conv
 
@@ -69,9 +66,9 @@ def up_conv_block(in_ch, out_ch, dropout_rate=0.25):
     # conv = nn.Sequential(
     #     ResidualBlock(in_ch, out_ch),
     #     SEBlock(out_ch),
-    #     nn.Dropout(dropout_rate),
-    #     ResidualBlock(out_ch, out_ch),
-    #     SEBlock(out_ch),
+    #     # nn.Dropout(dropout_rate),
+    #     # ResidualBlock(out_ch, out_ch),
+    #     # SEBlock(out_ch),
     # )
         
     return conv
@@ -203,18 +200,6 @@ class UNet_Chunk(Module):
         #     nn.ReLU(inplace=True)
         # )
 
-        # self.Up5 = up_conv(self.filter_list[4], self.filter_list[3])
-        # self.Up_conv5 = conv_block(self.filter_list[4], self.filter_list[3])
-
-        # self.Up4 = up_conv(self.filter_list[3], self.filter_list[2])
-        # self.Up_conv4 = conv_block(self.filter_list[3], self.filter_list[2])
-
-        # self.Up3 = up_conv(self.filter_list[2], self.filter_list[1])
-        # self.Up_conv3 = conv_block(self.filter_list[2], self.filter_list[1])
-
-        # self.Up2 = up_conv(self.filter_list[1], self.filter_list[0])
-        # self.Up_conv2 = conv_block(self.filter_list[1], self.filter_list[0])
-
         self.Up5 = up_conv(1920, self.filter_list[3])
         self.Up_conv5 = up_conv_block(self.filter_list[4]+self.filter_list[3], self.filter_list[3])
 
@@ -238,8 +223,11 @@ class UNet_Chunk(Module):
         self.model = models.densenet201(pretrained=True)
         self.model.classifier = nn.Linear(self.model.classifier.in_features, 3)
 
+        # self.model = timm.create_model('inception_resnet_v2', pretrained=False)
+        # self.model.classif = nn.Linear(self.model.classif.in_features, 3)
+
         # model_dict = self.model.state_dict()
-        # pretrained_dict = torch.load('/home/ziruiqiu/MscStudy/MT-UNet/Module/run/_H5NfP/NET_gbktU/NET.pt',map_location=self.device)
+        # pretrained_dict = torch.load('/home/ziruiqiu/MscStudy/MT-UNet/CL/run/_tBodh/NET_FrEje/NET.pt',map_location=self.device)
         # # 更新当前模型的字典
         # pretrained_dict = {k.replace("model.", ""): v for k, v in pretrained_dict.items()}
         # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
@@ -249,13 +237,13 @@ class UNet_Chunk(Module):
         # for name, param in self.model.named_parameters():
         #     param.requires_grad = False
 
-        def get_features(module, input, output):
-            self.denseblock4_output = output
-        self.hook = self.model.features.denseblock4.register_forward_hook(get_features)
+        # def get_features(module, input, output):
+        #     self.denseblock4_output = output
+        # self.hook = self.model.features.denseblock4.register_forward_hook(get_features)
 
-        def get_norm5(module, input, output):
-            self.norm5_output = output
-        self.hook = self.model.features.norm5.register_forward_hook(get_norm5)
+        # def get_norm5(module, input, output):
+        #     self.norm5_output = output
+        # self.hook = self.model.features.norm5.register_forward_hook(get_norm5)
 
     def forward(self, x):
         
@@ -297,20 +285,21 @@ class UNet_Chunk(Module):
 
         class_out = self.model(x_class)
 
+
         # encoding path
-        e1 = self.Conv1(x)
+        # e1 = self.Conv1(x)
 
-        e2 = self.Maxpool1(e1)
-        e2 = self.Conv2(e2)
+        # e2 = self.Maxpool1(e1)
+        # e2 = self.Conv2(e2)
 
-        e3 = self.Maxpool2(e2)
-        e3 = self.Conv3(e3)
+        # e3 = self.Maxpool2(e2)
+        # e3 = self.Conv3(e3)
 
-        e4 = self.Maxpool3(e3)
-        e4 = self.Conv4(e4)
+        # e4 = self.Maxpool3(e3)
+        # e4 = self.Conv4(e4)
 
-        e5 = self.Maxpool4(e4)
-        e5 = self.Conv5(e5)
+        # e5 = self.Maxpool4(e4)
+        # e5 = self.Conv5(e5)
 
         ##residual
         # e1 = self.Stem(x)
@@ -328,37 +317,37 @@ class UNet_Chunk(Module):
         # e5 = self.Down4(e5)
         # e5 = self.Res5(e5)
 
-        #decoding path for collaprative learning
-        d5 = self.Up5(self.denseblock4_output)
-        # print('d5.shape',d5.shape)
-        # print('e5.shape',e5.shape)
-        d5 = torch.cat((e5, d5), dim=1)
-        d5 = self.Up_conv5(d5)
+        #decoding path
+        # d5 = self.Up5(self.denseblock4_output)
+        # # print('d5.shape',d5.shape)
+        # # print('e5.shape',e5.shape)
+        # d5 = torch.cat((e5, d5), dim=1)
+        # d5 = self.Up_conv5(d5)
 
 
-        d4 = self.Up4(d5)
-        # print('d4.shape',d4.shape)
-        # print('e4.shape',e4.shape)
-        d4 = torch.cat((e4, d4), dim=1)
-        d4 = self.Up_conv4(d4)
+        # d4 = self.Up4(d5)
+        # # print('d4.shape',d4.shape)
+        # # print('e4.shape',e4.shape)
+        # d4 = torch.cat((e4, d4), dim=1)
+        # d4 = self.Up_conv4(d4)
 
-        d3 = self.Up3(d4)
-        # print('d3.shape',d3.shape)
-        # print('e3.shape',e3.shape)
-        d3 = torch.cat((e3, d3), dim=1)
-        d3 = self.Up_conv3(d3)
+        # d3 = self.Up3(d4)
+        # # print('d3.shape',d3.shape)
+        # # print('e3.shape',e3.shape)
+        # d3 = torch.cat((e3, d3), dim=1)
+        # d3 = self.Up_conv3(d3)
 
-        d2 = self.Up2(d3)
-        # print('d2.shape',d2.shape)
-        # print('e2.shape',e2.shape)
-        d2 = torch.cat((e2, d2), dim=1)
-        d2 = self.Up_conv2(d2)
+        # d2 = self.Up2(d3)
+        # # print('d2.shape',d2.shape)
+        # # print('e2.shape',e2.shape)
+        # d2 = torch.cat((e2, d2), dim=1)
+        # d2 = self.Up_conv2(d2)
 
-        d1 = self.Up1(d2)
-        # print('d1.shape',d1.shape)
-        # print('e1.shape',e1.shape)
-        d1 = torch.cat((e1, d1), dim=1)
-        d1 = self.Up_conv1(d1)
+        # d1 = self.Up1(d2)
+        # # print('d1.shape',d1.shape)
+        # # print('e1.shape',e1.shape)
+        # d1 = torch.cat((e1, d1), dim=1)
+        # d1 = self.Up_conv1(d1)
 
         #densenet
         # d1 = self.Up1(d2)
@@ -369,26 +358,10 @@ class UNet_Chunk(Module):
         # d0 = torch.cat((e, d0), dim=1)
         # d0 = self.Up_conv(d0)
 
-        #decoing path for basline and res se unet
-        # d5 = self.Up5(e5)
+        d1 = self.conv(x_class)
 
-        # d5 = torch.cat((e4, d5), dim=1)
-        # d5 = self.Up_conv5(d5)
-
-        # d4 = self.Up4(d5)
-        # d4 = torch.cat((e3, d4), dim=1)
-        # d4 = self.Up_conv4(d4)
-
-        # d3 = self.Up3(d4)
-        # d3 = torch.cat((e2, d3), dim=1)
-        # d3 = self.Up_conv3(d3)
-
-        # d2 = self.Up2(d3)
-        # d2 = torch.cat((e1, d2), dim=1)
-        # d2 = self.Up_conv2(d2)
         #return class_out,d1
-        return self.norm5_output,d1#, d2, e4, e3, d2, d3, d4, d5
-        #return e5,d2
+        return class_out,d1#, d2, e4, e3, d2, d3, d4, d5
     
     
     
@@ -408,13 +381,9 @@ class MTL_UNet(UNet_Chunk):
             if 'class' in self.out_dict:
                 if self.out_dict['class']>0:
                     self.out_classification = classification_head(
-                        in_features=1984,
+                        in_features=self.filter_list[-1],
                         mid_features=self.filter_list[0], out_features=self.out_dict['class'],
                         dropout_rate=0.25)
-                    # self.out_classification = classification_head(
-                    #     in_features=self.filter_list[0] + self.filter_list[-1],
-                    #     mid_features=self.filter_list[0], out_features=self.out_dict['class'],
-                    #     dropout_rate=0.25)
             if 'image' in self.out_dict:
                 if self.out_dict['image']>0:
                     self.out_conv_image = conv_bn_acti_drop(
@@ -441,16 +410,16 @@ class MTL_UNet(UNet_Chunk):
             r = []
             if 'class' in self.out_dict:
                 if self.out_dict['class']>0:
-                    average_pool_e5 = e5.mean(dim=(-2,-1))
-                    average_pool_d2 = d2.mean(dim=(-2,-1))
-                    average_pool = torch.cat((average_pool_e5, average_pool_d2), dim=1)
-                    # print('average_pool.shape',average_pool.shape)                  
-                    y_class = self.out_classification(average_pool)
+                    # average_pool_e5 = e5.mean(dim=(-2,-1))
+                    # average_pool_d2 = d2.mean(dim=(-2,-1))
+                    # average_pool = torch.cat((average_pool_e5, average_pool_d2), dim=1)
+                    # # print('average_pool.shape',average_pool.shape)                  
+                    # y_class = self.out_classification(average_pool)
                     #print('y_class.shape',y_class.shape)
                     # y_class = (y_class1 + y_class2 + y_class3) / 3
                     #print('y_class.shape',y_class.shape)
                     #breakpoint()
-                    r.append(y_class)
+                    r.append(e5)
                 else:
                     r.append(self.dummy_tensor)
             else:
@@ -556,7 +525,7 @@ class MTL_UNet_preset(MTL_UNet):
         
 
         
-        loss_sum = class_loss_weighted + image_loss_weighted 
+        loss_sum = class_loss_raw#class_loss_weighted + image_loss_weighted 
         # print('class_loss_weighted', class_loss_weighted)
         # print('image_loss_weighted', image_loss_weighted)
         # print('contrastive_loss_raw', contrastive_loss_raw)

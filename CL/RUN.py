@@ -65,9 +65,9 @@ if __name__ == '__main__':
     print(folder_string)
 
     data_timer = QuickTimer()
-    path = '/media/ziruiqiu/OS/data'
-    batch_size = 6
-    epoch_max = 40
+    path = '/media/ziruiqiu/OS/data320x256'
+    batch_size = 32
+    epoch_max = 50
         
     dataAll = DataMaster(path=path, batch_size=batch_size)
     print('Data Preparing time: %fsec'%data_timer())
@@ -82,10 +82,10 @@ if __name__ == '__main__':
     # for param in Net.parameters():
     #     print(param.dtype)
 
-    # model = GSGNet_T().to(device)
+    #model = GSGNet_T().to(device)
     # model = GSGNet_T()
-    # # weight = torch.load("/home/ziruiqiu/MscStudy/MT-UNet/Module/models/salicon.pt",map_location='cpu')
-    # # model.load_state_dict(weight)
+    # weight = torch.load("/home/ziruiqiu/MscStudy/MT-UNet/Module/models/salicon.pt",map_location='cpu')
+    # model.load_state_dict(weight)
     # model.to(device)
 
 
@@ -105,26 +105,6 @@ if __name__ == '__main__':
     #     print("Model parameters have not changed.")
     # model.to(device)
 
-    # model_dict = Net.state_dict()
-    # # Before loading pretrained dict
-    # first_conv_weights_before = next(Net.parameters()).clone()
-    # pretrained_dict = torch.load('/home/ziruiqiu/MscStudy/MT-UNet/KL/log/_0oLlq/NET_cnAYx/NET.pt')
-    # model_dict.update(pretrained_dict)
-
-    # Net.load_state_dict(model_dict)
-    # 
-    # print(Net.model.classifier.in_features)
-    # for k in pretrained_dict.keys():
-    #     print(f"Checking parameter: {k}")  # 确认这个循环是否被执行
-    #     if k in model_dict:
-    #         if torch.equal(pretrained_dict[k], model_dict[k]):
-    #             print(f"Parameter {k} has been loaded correctly.")
-    #         else:
-    #             print(f"Parameter {k} has not been loaded correctly.")
-    #     else:
-    #         print(f"Parameter {k} is not in the model_dict.")
-
-    #'model.classifier.weight', 'model.classifier.bias'
     #print(model)
     netLearn = NetLearn(
         net=Net,

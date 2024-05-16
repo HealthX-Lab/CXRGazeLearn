@@ -66,8 +66,8 @@ if __name__ == '__main__':
 
     data_timer = QuickTimer()
     path = '/media/ziruiqiu/OS/data'
-    batch_size = 6
-    epoch_max = 40
+    batch_size = 16
+    epoch_max = 50
         
     dataAll = DataMaster(path=path, batch_size=batch_size)
     print('Data Preparing time: %fsec'%data_timer())
@@ -82,10 +82,10 @@ if __name__ == '__main__':
     # for param in Net.parameters():
     #     print(param.dtype)
 
-    # model = GSGNet_T().to(device)
+    #model = GSGNet_T().to(device)
     # model = GSGNet_T()
-    # # weight = torch.load("/home/ziruiqiu/MscStudy/MT-UNet/Module/models/salicon.pt",map_location='cpu')
-    # # model.load_state_dict(weight)
+    # weight = torch.load("/home/ziruiqiu/MscStudy/MT-UNet/Module/models/salicon.pt",map_location='cpu')
+    # model.load_state_dict(weight)
     # model.to(device)
 
 
@@ -108,23 +108,30 @@ if __name__ == '__main__':
     # model_dict = Net.state_dict()
     # # Before loading pretrained dict
     # first_conv_weights_before = next(Net.parameters()).clone()
-    # pretrained_dict = torch.load('/home/ziruiqiu/MscStudy/MT-UNet/KL/log/_0oLlq/NET_cnAYx/NET.pt')
+    # pretrained_dict = torch.load('/home/ziruiqiu/MscStudy/MT-UNet/Module/run/_J8Bp0/NET_SEWch/NET.pt')
     # model_dict.update(pretrained_dict)
 
     # Net.load_state_dict(model_dict)
-    # 
-    # print(Net.model.classifier.in_features)
-    # for k in pretrained_dict.keys():
-    #     print(f"Checking parameter: {k}")  # 确认这个循环是否被执行
-    #     if k in model_dict:
-    #         if torch.equal(pretrained_dict[k], model_dict[k]):
-    #             print(f"Parameter {k} has been loaded correctly.")
-    #         else:
-    #             print(f"Parameter {k} has not been loaded correctly.")
-    #     else:
-    #         print(f"Parameter {k} is not in the model_dict.")
+    # # 
+    # # print(Net.model.classifier.in_features)
+    # # for k in pretrained_dict.keys():
+    # #     print(f"Checking parameter: {k}")  # 确认这个循环是否被执行
+    # #     if k in model_dict:
+    # #         if torch.equal(pretrained_dict[k], model_dict[k]):
+    # #             print(f"Parameter {k} has been loaded correctly.")
+    # #         else:
+    # #             print(f"Parameter {k} has not been loaded correctly.")
+    # #     else:
+    # #         print(f"Parameter {k} is not in the model_dict.")
 
-    #'model.classifier.weight', 'model.classifier.bias'
+    # #'model.classifier.weight', 'model.classifier.bias'
+    # Net.out_classification = classification_head(1984,64, 3,0.25)
+    # for name, param in Net.named_parameters():
+    #     if 'out_classification' in name:
+    #         param.requires_grad = True
+    #     else:
+    #         param.requires_grad = False
+    # Net.to(device)
     #print(model)
     netLearn = NetLearn(
         net=Net,

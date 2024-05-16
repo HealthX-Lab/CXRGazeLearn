@@ -20,8 +20,6 @@ from hzhu_data import *
 from hzhu_metrics_class import *
 from loss import *
 import torchvision.transforms as transforms
-from scipy import stats
-
 
 class NetLearn:
     
@@ -64,9 +62,6 @@ class NetLearn:
         self.test_loss_list = []
         self.metrics_list = []
         self.lr_list = []
-
-        self.saliency_map_pred_list = []
-        self.saliency_map_true_list = []
         
         self.name = name
         self.path = path
@@ -104,13 +99,14 @@ class NetLearn:
         loss_list = []
         count = 0
         total_loss = 0.0
-        alpha = 0.001
+        total_samples = 0  # 用于计算平均损失
         
         for data in dataLoader:
             
             #print(count)
             count += 1
             X = data['cxr'].to(self.device).unsqueeze(1)
+            #print(X.shape)
             #X = X.repeat(1,3,1,1)
             Y_class = data['Y'].to(self.device).long()
             Y_saliency = data['gaze'].to(self.device).unsqueeze(1)
@@ -119,203 +115,74 @@ class NetLearn:
             cumulative_loss = 0.0
 
             with autocast(): 
-                Y_class_pred, Y_saliency_pred = self.net(X)# 
+                contrast_features, Y_saliency_pred = self.net(X)# 
                 #print(contrast_features.shape)
-                Y_saliency_pred_shape = Y_saliency_pred.shape
-                Y_saliency_pred = F.log_softmax(Y_saliency_pred.flatten(start_dim=-2, end_dim=-1), dim=-1).reshape(Y_saliency_pred_shape)
-                #print(Y_saliency_pred.shape)
 
+            for i in range(contrast_features.size(0)):
+                anchor = contrast_features[i].unsqueeze(0)
+                anchor_label = Y_class[i]
 
-                net_list = self.net.compute_loss(
-                    y_class_pred=Y_class_pred,
-                    y_image_pred=Y_saliency_pred,
-                    y_class_true=Y_class, 
-                    y_image_true=Y_saliency,
-                    loss_class=self.criterion['class'],
-                    loss_image_list=[self.criterion['saliency'],])
+                # 正样本和负样本的选择逻辑与之前相同
+                positive_indices = ((Y_class == anchor_label) & (torch.arange(Y_class.size(0), device=Y_class.device) != i)).nonzero(as_tuple=True)[0]
+                negative_indices = (Y_class != anchor_label).nonzero(as_tuple=True)[0]
 
-                #net_list = self.net.compute_loss_contrast(contrast_features)
-            loss = net_list['loss_sum']
+                for pos_idx in positive_indices:
+                    positive = contrast_features[pos_idx].unsqueeze(0)
+                    for neg_idx in negative_indices:
+                        negative = contrast_features[neg_idx].unsqueeze(0)
 
-            #loss = net_list['contrast_loss_raw']
-            # loss = self.triplet_loss(contrast_features[0], contrast_features[1], contrast_features[2])
-            
-            self.optimizer.zero_grad()
-            
-            # Y_saliency_pred,_,_= self.net(X)
-
-            # # print(Y_saliency.shape) 
-            # Y_saliency = Y_saliency.squeeze(1)  # 去除通道维度，现在形状为 [8, 640, 512]
-
-            # loss_KL = kldiv(Y_saliency_pred,Y_saliency)
-            # loss_CC = cc(Y_saliency_pred,Y_saliency)
-                
-            
-            # loss =  1.0 * (loss_KL - loss_CC)
-            
-            self.scaler.scale(loss).backward()
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-
-            # for i in range(contrast_features.size(0)):
-            #     anchor = contrast_features[i].unsqueeze(0)
-            #     anchor_label = Y[i]
-
-            #     # 正样本和负样本的选择逻辑与之前相同
-            #     positive_indices = ((Y == anchor_label) & (torch.arange(Y.size(0), device=Y.device) != i)).nonzero(as_tuple=True)[0]
-            #     negative_indices = (Y != anchor_label).nonzero(as_tuple=True)[0]
-
-            #     for pos_idx in positive_indices:
-            #         positive = contrast_features[pos_idx].unsqueeze(0)
-            #         for neg_idx in negative_indices:
-            #             negative = contrast_features[neg_idx].unsqueeze(0)
-
-            #             # 计算三元组损失
-            #             loss = self.triplet_loss(anchor, positive, negative)
-            #             cumulative_loss += loss
+                        # 计算三元组损失
+                        loss = self.triplet_loss(anchor, positive, negative)
+                        cumulative_loss += loss
 
             # 累积损失的反向传播
-            # self.optimizer.zero_grad()
-            # self.scaler.scale(cumulative_loss).backward()
-            # self.scaler.step(self.optimizer)
-            # self.scaler.update()
+            self.optimizer.zero_grad()
+            self.scaler.scale(cumulative_loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            total_loss += cumulative_loss
+            total_samples += len(data['cxr'])  # 增加处理的样本总
             
-            # total_loss += cumulative_loss.item()
             
-            #print(loss)
-            loss_list.append(loss.detach().clone().cpu())
-        
-            del data, X,  loss, Y_class,Y_saliency,Y_saliency_pred#,net_list,Y_class_pred
-        #average_loss = total_loss / count
-        return loss_list
-        #return average_loss
+            del data, X,  loss, Y_class,Y_saliency,Y_saliency_pred#,Y_class_pred, net_list
+        average_loss = total_loss / total_samples
+        return average_loss
 
     def eval_iterate(self, dataLoader):
         self.net.eval()
-        loss_list = []
-
-        metrics_class = self.metrics['class']()
-        metrics_saliency = self.metrics['saliency']()
-
-        KL = 0.0
-        CC = 0.0
+        total_loss = 0.0
+        total_samples = 0  # 用于计算平均损失
 
         with torch.no_grad():
             counter = 0
             for data in dataLoader:
                 X = data['cxr'].to(self.device).unsqueeze(1)
-                X1 = X
                 Y_class = data['Y'].to(self.device).long()
                 Y_saliency = data['gaze'].to(self.device).unsqueeze(1)
                 Y_saliency = Y_saliency/Y_saliency.sum(dim=(-2,-1), keepdim=True)
                 #X = X.repeat(1,3,1,1)
-                Y_class_pred, Y_saliency_pred = self.net(X)
-                
+                cumulative_loss = 0.0
+                contrast_features, Y_saliency_pred = self.net(X)
+                for i in range(contrast_features.size(0)):
+                    anchor = contrast_features[i].unsqueeze(0)
+                    anchor_label = Y_class[i]
 
-                
-                # Y_saliency_pred,_,_ = self.net(X)
-                # Y_saliency = Y_saliency.squeeze(1)
-            #     loss_KL = kldiv(Y_saliency_pred,Y_saliency)
-            #     loss_CC = cc(Y_saliency_pred,Y_saliency)
-            #     loss =  1.0 * (loss_KL - loss_CC)
-            #     loss_list.append(loss.detach().clone().cpu())
-            #     KL += loss_KL
-            #     CC += loss_CC
-            #     Y_saliency_pred_shape = Y_saliency_pred.shape
-            #     Y_saliency_pred = F.log_softmax(Y_saliency_pred.flatten(start_dim=-2, end_dim=-1), dim=-1).reshape(Y_saliency_pred_shape)
-            #     metrics_saliency.add_data(Y=Y_saliency, Y_pred=Y_saliency_pred)
+                    # 正样本和负样本的选择逻辑与之前相同
+                    positive_indices = ((Y_class == anchor_label) & (torch.arange(Y_class.size(0), device=Y_class.device) != i)).nonzero(as_tuple=True)[0]
+                    negative_indices = (Y_class != anchor_label).nonzero(as_tuple=True)[0]
 
-            #     del data, X,  loss, Y_class,Y_saliency#
+                    for pos_idx in positive_indices:
+                        positive = contrast_features[pos_idx].unsqueeze(0)
+                        for neg_idx in negative_indices:
+                            negative = contrast_features[neg_idx].unsqueeze(0)
 
-            # KL = KL/len(dataLoader)
-            # CC = CC/len(dataLoader)
-            # return {'loss_KL':KL,'loss_CC':CC, 'metrics_saliency':metrics_saliency ,'loss':{'loss_sum':pd.DataFrame(loss_list)}}
-
-                
-                Y_saliency_pred_shape = Y_saliency_pred.shape
-                Y_saliency_pred = F.log_softmax(Y_saliency_pred.flatten(start_dim=-2, end_dim=-1), dim=-1).reshape(Y_saliency_pred_shape)
-                net_list = self.net.compute_loss(
-                    y_class_pred=Y_class_pred,
-                    y_image_pred=Y_saliency_pred,
-                    y_class_true=Y_class, 
-                    y_image_true=Y_saliency,
-                    loss_class=self.criterion['class'],
-                    loss_image_list=[self.criterion['saliency'],])
-                
-                metrics_class.add_data(Y_class, Y_class_pred)
-                metrics_saliency.add_data(Y=Y_saliency, Y_pred=Y_saliency_pred)
-                #draw Y_saliency_pred
-                # Apply exponential to convert from log softmax to probability
-                Y_saliency_pred_exp = torch.exp(Y_saliency_pred)
-
-                # Normalize each image for visualization
-                # Normalize each image for visualization
-                max_vals = Y_saliency_pred_exp.max(dim=2, keepdim=True)[0].max(dim=3, keepdim=True)[0]
-                Y_saliency_pred_norm = Y_saliency_pred_exp / max_vals
-                Y_pred = Y_class_pred.argmax(dim=1, keepdim=True)
- 
-                                
-                for i in range(Y_saliency_pred_norm.shape[0]):
-                    # Get the original image and saliency maps
-
-                    original_image = X[i].squeeze().cpu().numpy()
-                    original_saliency = Y_saliency[i].squeeze().cpu().numpy()
-                    predicted_saliency = Y_saliency_pred_norm[i].squeeze().cpu().numpy()
-                    
-                    # Normalize original saliency map for better visualization if it's not already
-                    original_saliency = original_saliency / np.max(original_saliency)
-                    
-                    # print(predicted_saliency)
-                    # print(original_saliency)
-                    # #save in txt
-                    # np.savetxt(f'predicted_saliency_{counter}_{Y_class[i].item()}_{Y_pred[i].item()}.txt', predicted_saliency)
-                    # np.savetxt(f'original_saliency_{counter}_{Y_class[i].item()}_{Y_pred[i].item()}.txt', original_saliency)
-                    # breakpoint()
-                    self.saliency_map_pred_list.append(predicted_saliency)
-                    self.saliency_map_true_list.append(original_saliency)
-                    # Create the overlay images
-                    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-                    ax.imshow(original_image, cmap='gray')
-                    #ax.imshow(predicted_saliency, cmap='jet', alpha=0.5)
-                    ax.set_title('Predicted Saliency')
-                    ax.axis('off')
-
-                    # Save the original image
-                    plt.savefig(os.path.join(self.path, f'original_image_{counter}.png'), bbox_inches='tight')
-
-
-                    # fig, ax = plt.subplots(1, 2, figsize=(10, 5))
-                    
-                    # # Original image with original saliency
-                    # ax[0].imshow(original_image, cmap='gray')
-                    # ax[0].imshow(original_saliency, cmap='jet', alpha=0.5)
-                    # ax[0].set_title('Original Saliency')
-                    # ax[0].axis('off')
-
-                    # # Original image with predicted saliency
-                    # ax[1].imshow(original_image, cmap='gray')
-                    # ax[1].imshow(predicted_saliency, cmap='jet', alpha=0.5)
-                    # ax[1].set_title('Predicted Saliency')
-                    # ax[1].axis('off')
-
-
-                    # # Save the composite image
-                    # plt.savefig(os.path.join(self.path, f'composite_saliency_map_{counter}_{Y_class[i].item()}_{Y_pred[i].item()}.png'), bbox_inches='tight')
-                    counter += 1
-                    plt.close(fig)
-                
-
-                
-
-                for item in net_list:
-                    tmp = {}
-                    tmp[item] = net_list[item].detach().clone().cpu()
-                    loss_list.append(tmp)
-                
-
-                del data, X, Y_class, Y_saliency, Y_class_pred, Y_saliency_pred, net_list
-
-            return {'metrics_class':metrics_class, 'metrics_saliency':metrics_saliency, 'loss':pd.DataFrame(loss_list)}
+                            # 计算三元组损失
+                            loss = self.triplet_loss(anchor, positive, negative)
+                            cumulative_loss += loss
+                total_loss += cumulative_loss
+                total_samples += len(data['cxr'])  # 增加处理的样本总数
+        average_loss = total_loss / total_samples
+        return average_loss
     
     
     def save_net(self, path):
@@ -354,27 +221,31 @@ class NetLearn:
             train_loss = self.train_iterate(self.dataAll('Train'))
             eval_valid = self.eval_iterate(self.dataAll('Valid'))
 
-            self.train_loss_list.append(np.mean(train_loss))
-            self.valid_loss_list.append(eval_valid['loss']['loss_sum'].mean())
+            self.train_loss_list.append(train_loss)
+            self.valid_loss_list.append(eval_valid)
 
-            eval_metrics = eval_valid['metrics_class'].get_key_evaluation()
-            self.metrics_list.append(eval_metrics)
+            # eval_metrics = eval_valid['metrics_class'].get_key_evaluation()
+            # self.metrics_list.append(eval_metrics)
 
             self.scheduler.step(self.valid_loss_list[-1])
             self.lr_list.append(self.optimizer.param_groups[0]['lr'])
 
-            #print('Epoch:%4d, loss_train:%.6f, time:%3.2fsec'%(self.epoch, self.train_loss_list[-1], time.perf_counter()-time0))
-
-            print('Epoch:%4d, loss_train:%.6f, loss_val:%.6f [%.4e %.4e (%s)], val_acc:%.3f, val_KL:%.3f, time:%3.2fsec'%(\
+            print('Epoch:%4d, loss_train:%.6f, loss_val:%.6f, time:%3.2fsec'%(\
                     self.epoch,\
                     self.train_loss_list[-1],\
                     self.valid_loss_list[-1],\
-                    eval_valid['loss']['class_loss_raw'].mean(),\
-                    eval_valid['loss']['image_loss_raw'].mean(),\
-                    self.net.get_status_str(),\
-                    self.metrics_list[-1],\
-                    eval_valid['metrics_saliency'].get_key_evaluation(),\
                     time.perf_counter()-time0))
+
+            # print('Epoch:%4d, loss_train:%.6f, loss_val:%.6f [%.4e %.4e (%s)], val_acc:%.3f, val_KL:%.3f, time:%3.2fsec'%(\
+            #         self.epoch,\
+            #         self.train_loss_list[-1],\
+            #         self.valid_loss_list[-1],\
+            #         eval_valid['loss']['class_loss_raw'].mean(),\
+            #         eval_valid['loss']['image_loss_raw'].mean(),\
+            #         self.net.get_status_str(),\
+            #         self.metrics_list[-1],\
+            #         eval_valid['metrics_saliency'].get_key_evaluation(),\
+            #         time.perf_counter()-time0))
 
             # print('Epoch:%4d, loss_train:%.6f, loss_val:%.6f , val_KL:%.3f, val_CC:%.3f, time:%3.2fsec'%(\
             #         self.epoch,\
@@ -385,15 +256,14 @@ class NetLearn:
             #         time.perf_counter()-time0))
 
             del eval_valid
-            del eval_metrics
+            # del eval_metrics
             del train_loss
-            # self.save_net(self.save_path)
-            # print('- network saved')
+            
             if self.train_judgetment():
                 break
 
         self.load_net(self.save_path)
-        self.save_training_process()
+        #self.save_training_process()
                 
     def train_judgetment(self):
         
@@ -524,24 +394,7 @@ class NetLearn:
         
     def evaluate(self):
         
-        
         eval_test = self.eval_iterate(self.dataAll('Valid'))
-
-        # 对整个数据集执行配对样本t检验
-
-        # all_saliency_data = np.concatenate([img.flatten() for img in self.saliency_map_pred_list])
-        # all_attention_data = np.concatenate([img.flatten() for img in self.saliency_map_true_list])
-
-        # t_statistic, p_value = stats.ttest_rel(self.saliency_map_pred_list[0].flatten(), self.saliency_map_true_list[0].flatten())
-
-        # print(f"T统计量: {t_statistic}, P值: {p_value}")
-
-        # # 判断显著性
-        # if p_value < 0.05:
-        #     print("生成的显著性图与医生的注意力图之间存在显著差异。")
-        # else:
-        #     print("生成的显著性图与医生的注意力图之间没有显著差异。")
-
         eval_test['metrics_class'].compute_classification_report()
         eval_test['metrics_class'].save_classification_report('classification_report', self.save_path)
         eval_test['metrics_class'].save_outputs('classification_results', self.save_path)

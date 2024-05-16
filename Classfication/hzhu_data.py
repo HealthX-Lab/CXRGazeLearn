@@ -49,7 +49,7 @@ class DataMaster:
         num_workers = torch.get_num_threads()-1 if torch.get_num_threads()<=9 else 8
         self.handle = {item:DataHandle(self.path+'/'+item) for item in name_list}
         self.dataLoader = {item:DataLoader(
-            self.handle[item], batch_size=self.batch_size, shuffle=False,
+            self.handle[item], batch_size=self.batch_size, shuffle=True,
             num_workers=num_workers, pin_memory=True, prefetch_factor=4) for item in name_list}
         
     def __call__(self, key):

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
 
 
 from hzhu_data_raw import *
@@ -10,22 +9,20 @@ from hzhu_gen import *
 import argparse
 
 
-# In[2]:
-
 
 if __name__ == '__main__':
     QH = QuickHelper()
     
     print('Running on my laptop')
-    gaze_path = 'D:/Gaze Dataset/Eye gaze data for chest X-rays/extracted'
-    cxr_path = 'D:/Gaze Dataset/MIMIC-CXR & GAZE (master)/RAW/CXR'
+    gaze_path = '/home/ziruiqiu/MscStudy/eye-gaze-dataset/physionet.org/files/egd-cxr/1.0.0'
+    cxr_path = '/home/ziruiqiu/MscStudy/eye-gaze-dataset'
     save_path = os.getcwd()
-    fraction = 0.01
+    fraction = 1.0
     
     print('Data preparation completed')
     print(QH)
 
-    downsample = 5
+    downsample = 10
     blur = 500
     path_str = 'data'
 

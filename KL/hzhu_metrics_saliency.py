@@ -82,12 +82,6 @@ class MetricsHandle_Saliency:
         self.histogram_similarity_list = np.array(self.histogram_similarity_list)
         self.CC_list = np.array(self.CC_list)
         
-        #save the results of KL_loss_list, CC_list, histogram_similarity_list
-        np.savetxt('KL_list.txt', self.KL_loss_list)
-        np.savetxt('CC_list.txt', self.CC_list)
-        np.savetxt('HS_list.txt', self.histogram_similarity_list)
-
-
         self.prediction_report = {
             'KL_mean': float(self.KL_loss_list.mean()),
             'KL_median': float(np.median(self.KL_loss_list)),

@@ -25,7 +25,7 @@ class GazeDataHandle:
         self.process()
         
     def process(self):
-        self.groups = self.eye_gaze.groupby(['DICOM_ID'])
+        self.groups = self.eye_gaze.groupby('DICOM_ID')
         self.data_gaze = {item[0]:item[1] for item in self.groups if len(item[0])==44 and item[0] in self.selected_DICOM_ID}
 
     def __getitem__(self, i):
@@ -44,7 +44,11 @@ class CXRDataHandle:
         self.root_path = root_path
     
     def __getitem__(self, info):
-        path = info['path'].iloc[0][10:]
+        path = info['path'].iloc[0]
+        # print(info['path'].iloc[0])
+        # print(path)
+        # print(self.root_path)
+        #print(self.root_path+'/'+path)
         image = dcmread(self.root_path+'/'+path).pixel_array.astype(np.float32)
         return image
     
@@ -95,7 +99,7 @@ class MasterDataHandle:
     
     def plot(self, i, blur):
         data = self[i]
-        self.process(data, downsample=5)
+        self.process(data, downsample=10)
         
         plt.figure(figsize=(10,8))
         plt.subplot(2,3,1)
@@ -175,6 +179,7 @@ class MasterDataHandle:
             create_folder(item)
             
         N = int(len(self)*fraction)
+        print('Total number of data: %d'%len(self))
         index_use, index_n = torch.utils.data.random_split(
             range(len(self)), [N, len(self)-N], generator=torch.Generator().manual_seed(seed))
         

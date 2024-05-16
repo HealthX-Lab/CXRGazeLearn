@@ -20,8 +20,6 @@ from hzhu_data import *
 from hzhu_metrics_class import *
 from loss import *
 import torchvision.transforms as transforms
-from scipy import stats
-
 
 class NetLearn:
     
@@ -64,9 +62,6 @@ class NetLearn:
         self.test_loss_list = []
         self.metrics_list = []
         self.lr_list = []
-
-        self.saliency_map_pred_list = []
-        self.saliency_map_true_list = []
         
         self.name = name
         self.path = path
@@ -142,8 +137,8 @@ class NetLearn:
             
             self.optimizer.zero_grad()
             
-            # Y_saliency_pred,_,_= self.net(X)
-
+            # pred_maps = self.net(X)
+            # # print(pred_maps.shape)
             # # print(Y_saliency.shape) 
             # Y_saliency = Y_saliency.squeeze(1)  # 去除通道维度，现在形状为 [8, 640, 512]
 
@@ -184,8 +179,8 @@ class NetLearn:
             
             #print(loss)
             loss_list.append(loss.detach().clone().cpu())
-        
-            del data, X,  loss, Y_class,Y_saliency,Y_saliency_pred#,net_list,Y_class_pred
+            
+            del data, X,  loss, Y_class,Y_saliency,Y_class_pred,Y_saliency_pred, net_list
         #average_loss = total_loss / count
         return loss_list
         #return average_loss
@@ -210,26 +205,21 @@ class NetLearn:
                 Y_saliency = Y_saliency/Y_saliency.sum(dim=(-2,-1), keepdim=True)
                 #X = X.repeat(1,3,1,1)
                 Y_class_pred, Y_saliency_pred = self.net(X)
-                
-
-                
-                # Y_saliency_pred,_,_ = self.net(X)
-                # Y_saliency = Y_saliency.squeeze(1)
+            #     pred_maps = self.net(X)
+            #     Y_saliency = Y_saliency.squeeze(1)
+             
             #     loss_KL = kldiv(Y_saliency_pred,Y_saliency)
             #     loss_CC = cc(Y_saliency_pred,Y_saliency)
             #     loss =  1.0 * (loss_KL - loss_CC)
             #     loss_list.append(loss.detach().clone().cpu())
             #     KL += loss_KL
             #     CC += loss_CC
-            #     Y_saliency_pred_shape = Y_saliency_pred.shape
-            #     Y_saliency_pred = F.log_softmax(Y_saliency_pred.flatten(start_dim=-2, end_dim=-1), dim=-1).reshape(Y_saliency_pred_shape)
-            #     metrics_saliency.add_data(Y=Y_saliency, Y_pred=Y_saliency_pred)
 
             #     del data, X,  loss, Y_class,Y_saliency#
 
             # KL = KL/len(dataLoader)
             # CC = CC/len(dataLoader)
-            # return {'loss_KL':KL,'loss_CC':CC, 'metrics_saliency':metrics_saliency ,'loss':{'loss_sum':pd.DataFrame(loss_list)}}
+            # return {'loss_KL':KL,'loss_CC':CC,'loss':{'loss_sum':pd.DataFrame(loss_list)}}
 
                 
                 Y_saliency_pred_shape = Y_saliency_pred.shape
@@ -250,59 +240,36 @@ class NetLearn:
 
                 # Normalize each image for visualization
                 # Normalize each image for visualization
-                max_vals = Y_saliency_pred_exp.max(dim=2, keepdim=True)[0].max(dim=3, keepdim=True)[0]
-                Y_saliency_pred_norm = Y_saliency_pred_exp / max_vals
-                Y_pred = Y_class_pred.argmax(dim=1, keepdim=True)
- 
-                                
-                for i in range(Y_saliency_pred_norm.shape[0]):
-                    # Get the original image and saliency maps
-
-                    original_image = X[i].squeeze().cpu().numpy()
-                    original_saliency = Y_saliency[i].squeeze().cpu().numpy()
-                    predicted_saliency = Y_saliency_pred_norm[i].squeeze().cpu().numpy()
+                # max_vals = Y_saliency_pred_exp.max(dim=2, keepdim=True)[0].max(dim=3, keepdim=True)[0]
+                # Y_saliency_pred_norm = Y_saliency_pred_exp / max_vals
+                # for i in range(Y_saliency_pred_norm.shape[0]):
+                #     # Get the original image and saliency maps
+                #     original_image = X[i].squeeze().cpu().numpy()
+                #     original_saliency = Y_saliency[i].squeeze().cpu().numpy()
+                #     predicted_saliency = Y_saliency_pred_norm[i].squeeze().cpu().numpy()
                     
-                    # Normalize original saliency map for better visualization if it's not already
-                    original_saliency = original_saliency / np.max(original_saliency)
+                #     # Normalize original saliency map for better visualization if it's not already
+                #     original_saliency = original_saliency / np.max(original_saliency)
                     
-                    # print(predicted_saliency)
-                    # print(original_saliency)
-                    # #save in txt
-                    # np.savetxt(f'predicted_saliency_{counter}_{Y_class[i].item()}_{Y_pred[i].item()}.txt', predicted_saliency)
-                    # np.savetxt(f'original_saliency_{counter}_{Y_class[i].item()}_{Y_pred[i].item()}.txt', original_saliency)
-                    # breakpoint()
-                    self.saliency_map_pred_list.append(predicted_saliency)
-                    self.saliency_map_true_list.append(original_saliency)
-                    # Create the overlay images
-                    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-                    ax.imshow(original_image, cmap='gray')
-                    #ax.imshow(predicted_saliency, cmap='jet', alpha=0.5)
-                    ax.set_title('Predicted Saliency')
-                    ax.axis('off')
-
-                    # Save the original image
-                    plt.savefig(os.path.join(self.path, f'original_image_{counter}.png'), bbox_inches='tight')
-
-
-                    # fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+                #     # Create the overlay images
+                #     fig, ax = plt.subplots(1, 2, figsize=(10, 5))
                     
-                    # # Original image with original saliency
-                    # ax[0].imshow(original_image, cmap='gray')
-                    # ax[0].imshow(original_saliency, cmap='jet', alpha=0.5)
-                    # ax[0].set_title('Original Saliency')
-                    # ax[0].axis('off')
+                #     # Original image with original saliency
+                #     ax[0].imshow(original_image, cmap='gray')
+                #     ax[0].imshow(original_saliency, cmap='jet', alpha=0.5)
+                #     ax[0].set_title('Original Saliency')
+                #     ax[0].axis('off')
 
-                    # # Original image with predicted saliency
-                    # ax[1].imshow(original_image, cmap='gray')
-                    # ax[1].imshow(predicted_saliency, cmap='jet', alpha=0.5)
-                    # ax[1].set_title('Predicted Saliency')
-                    # ax[1].axis('off')
+                #     # Original image with predicted saliency
+                #     ax[1].imshow(original_image, cmap='gray')
+                #     ax[1].imshow(predicted_saliency, cmap='jet', alpha=0.5)
+                #     ax[1].set_title('Predicted Saliency')
+                #     ax[1].axis('off')
 
-
-                    # # Save the composite image
-                    # plt.savefig(os.path.join(self.path, f'composite_saliency_map_{counter}_{Y_class[i].item()}_{Y_pred[i].item()}.png'), bbox_inches='tight')
-                    counter += 1
-                    plt.close(fig)
+                #     # Save the composite image
+                #     plt.savefig(os.path.join(self.path, f'composite_saliency_map_{counter}_{Y_class[i].item()}.png'), bbox_inches='tight')
+                #     counter += 1
+                #     plt.close(fig)
                 
 
                 
@@ -311,7 +278,6 @@ class NetLearn:
                     tmp = {}
                     tmp[item] = net_list[item].detach().clone().cpu()
                     loss_list.append(tmp)
-                
 
                 del data, X, Y_class, Y_saliency, Y_class_pred, Y_saliency_pred, net_list
 
@@ -387,8 +353,6 @@ class NetLearn:
             del eval_valid
             del eval_metrics
             del train_loss
-            # self.save_net(self.save_path)
-            # print('- network saved')
             if self.train_judgetment():
                 break
 
@@ -524,24 +488,7 @@ class NetLearn:
         
     def evaluate(self):
         
-        
         eval_test = self.eval_iterate(self.dataAll('Valid'))
-
-        # 对整个数据集执行配对样本t检验
-
-        # all_saliency_data = np.concatenate([img.flatten() for img in self.saliency_map_pred_list])
-        # all_attention_data = np.concatenate([img.flatten() for img in self.saliency_map_true_list])
-
-        # t_statistic, p_value = stats.ttest_rel(self.saliency_map_pred_list[0].flatten(), self.saliency_map_true_list[0].flatten())
-
-        # print(f"T统计量: {t_statistic}, P值: {p_value}")
-
-        # # 判断显著性
-        # if p_value < 0.05:
-        #     print("生成的显著性图与医生的注意力图之间存在显著差异。")
-        # else:
-        #     print("生成的显著性图与医生的注意力图之间没有显著差异。")
-
         eval_test['metrics_class'].compute_classification_report()
         eval_test['metrics_class'].save_classification_report('classification_report', self.save_path)
         eval_test['metrics_class'].save_outputs('classification_results', self.save_path)
