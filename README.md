@@ -7,7 +7,7 @@
 
 This repository contains the code used for the paper: [Enhancing joint automatic chest X-ray diagnosis and clinical visual attention prediction with multi-stage cooperative learning](https://arxiv.org/abs/2403.16970)
 
-Qiu, Zirui, Hassan Rivaz, and Yiming Xiao. "Joint chest X-ray diagnosis and clinical visual attention prediction with multi-stage cooperative learning: enhancing interpretability." arXiv preprint arXiv:2403.16970 (2024).
+Qiu, Zirui, Hassan Rivaz, and Yiming Xiao. "Enhancing joint automatic chest X-ray diagnosis and clinical visual attention prediction with multi-stage cooperative learning." arXiv preprint arXiv:2403.16970 (2024).
 
 Please cite the paper if you are using our model.
 
