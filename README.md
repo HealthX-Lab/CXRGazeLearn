@@ -5,7 +5,8 @@
     <img src="asset/image/heatmaps.png" alt="attention_map_generation"/>
 </p>
 
-Please cite the following paper if you are using our model.
+Please cite the following paper if you are using our model:
+
 Qiu Z, Rivaz H, Xiao Y. [Joint enhancement of automatic chest x-ray diagnosis and radiological gaze prediction with multistage cooperative learning](https://aapm.onlinelibrary.wiley.com/doi/10.1002/mp.17977). Med Phys. 2025 Jul;52(7):e17977. doi: 10.1002/mp.17977. PMID: 40665596; PMCID: PMC12264402.
 
 ## Installation
